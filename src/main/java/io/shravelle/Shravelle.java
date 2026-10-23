@@ -42,10 +42,11 @@ public final class Shravelle {
     /** Configuration with SHRAVELLE_* environment variable defaults. */
     public static final class Config {
         String endpoint = env("SHRAVELLE_ENDPOINT", "http://localhost:4318");
-        String apiKey = env("SHRAVELLE_API_KEY", "");
-        String serviceName = env("SHRAVELLE_SERVICE_NAME", env("OTEL_SERVICE_NAME", "java-app"));
-        String serviceVersion = env("SHRAVELLE_SERVICE_VERSION", "");
-        String environment = env("SHRAVELLE_ENV", "production");
+        String apiKey = env("SHRAVELLE_API_KEY", env("SHRAVELLE_LICENSE_KEY", ""));
+        String serviceName = env("SHRAVELLE_APP_NAME", env("SHRAVELLE_SERVICE_NAME", env("OTEL_SERVICE_NAME", "java-app")));
+        String serviceVersion = env("SHRAVELLE_APP_VERSION", env("SHRAVELLE_SERVICE_VERSION", ""));
+        String environment = env("SHRAVELLE_APP_ENV", env("SHRAVELLE_ENV", "production"));
+        String organisation = env("SHRAVELLE_ORGANISATION", env("SHRAVELLE_ORGANIZATION", ""));
         double sampleRate = Double.parseDouble(env("SHRAVELLE_SAMPLE_RATE", "1"));
         final Map<String, String> attributes = new HashMap<>();
 
@@ -54,6 +55,7 @@ public final class Shravelle {
         public Config serviceName(String v) { serviceName = v; return this; }
         public Config serviceVersion(String v) { serviceVersion = v; return this; }
         public Config environment(String v) { environment = v; return this; }
+        public Config organisation(String v) { organisation = v; return this; }
         public Config sampleRate(double v) { sampleRate = v; return this; }
         public Config attribute(String k, String v) { attributes.put(k, v); return this; }
     }
@@ -76,6 +78,7 @@ public final class Shravelle {
                 .append(",host.name=").append(host)
                 .append(",telemetry.distro.name=shravelle-java");
         if (!c.serviceVersion.isEmpty()) res.append(",service.version=").append(c.serviceVersion);
+        if (!c.organisation.isEmpty()) res.append(",shravelle.organization=").append(c.organisation);
         c.attributes.forEach((k, v) -> res.append(',').append(k).append('=').append(v));
         Map<String, String> props = new HashMap<>();
         props.put("otel.service.name", c.serviceName);
