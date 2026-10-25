@@ -13,12 +13,12 @@ import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.InetAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -125,7 +125,7 @@ public final class Shravelle {
     public static Tracer tracer() { return GlobalOpenTelemetry.getTracer("shravelle"); }
 
     /** Record an exception on the current transaction. */
-    public static void noticeError(Throwable t) { noticeError(t, Map.of()); }
+    public static void noticeError(Throwable t) { noticeError(t, Collections.<String, String>emptyMap()); }
 
     public static void noticeError(Throwable t, Map<String, String> attrs) {
         Span span = Span.current();
@@ -141,7 +141,7 @@ public final class Shravelle {
 
     public static void addAttribute(String key, long value) { Span.current().setAttribute(key, value); }
 
-    /** Business event on the current span, e.g. recordEvent("order.placed", Map.of("amount", "499")). */
+    /** Business event on the current span, e.g. recordEvent("order.placed", attrs) where attrs maps "amount" -&gt; "499". */
     public static void recordEvent(String name, Map<String, String> attrs) {
         AttributesBuilder b = Attributes.builder();
         attrs.forEach(b::put);
@@ -170,11 +170,20 @@ public final class Shravelle {
         Config c = current;
         String body = String.format("{\"service\":\"%s\",\"version\":\"%s\",\"commit\":\"%s\",\"description\":\"%s\",\"user\":\"%s\"}",
                 json(c.serviceName), json(version), json(commit), json(description), json(env("USER", "")));
-        HttpRequest req = HttpRequest.newBuilder(URI.create(c.endpoint.replaceAll("/$", "") + "/v1/deployments"))
-                .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json").header("X-API-Key", c.apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-        HttpResponse<String> resp = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() >= 300) throw new IllegalStateException("deployment marker failed: HTTP " + resp.statusCode());
+        URL url = new URL(c.endpoint.replaceAll("/$", "") + "/v1/deployments");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("X-API-Key", c.apiKey);
+        conn.setDoOutput(true);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(body.getBytes(StandardCharsets.UTF_8));
+        }
+        int status = conn.getResponseCode();
+        conn.disconnect();
+        if (status >= 300) throw new IllegalStateException("deployment marker failed: HTTP " + status);
     }
 
     private static String json(String s) { return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\""); }
