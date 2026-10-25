@@ -8,7 +8,7 @@
   <name>Shravelle APM for Java</name>
   <description>Programmatic OpenTelemetry setup and helpers for Shravelle (use the Java agent for zero-code instrumentation)</description>
   <properties>
-    <maven.compiler.release>11</maven.compiler.release>
+    <maven.compiler.release>8</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <otel.version>1.40.0</otel.version>
   </properties>
